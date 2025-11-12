@@ -1,4 +1,4 @@
-" autoload/simplynote.vim
+" autoload/SimplyNote.vim
 " ======================================
 
 " デバッグ出力関数
@@ -309,10 +309,31 @@ function! SimplyNote#list() abort
     autocmd CursorMoved <buffer> call SimplyNote#open()
   augroup END
  
-  " ENTERでViewバッファに移動するマッピング
-  nnoremap <buffer> <CR> :silent call <SID>GotoView()<CR>
-  nnoremap <buffer> <Enter> :silent call <SID>GotoView()<CR>
+  " u: SimplyNoteUpdate
+  nnoremap <buffer> u :silent call SimplyNoote#update()<CR>
 
+  " e: Viewへ移動してSimplyNoteEdit実行
+  nnoremap <buffer> e :silent call <SID>GotoView()<Bar>SimplyNoteEdit<CR>
+
+  " q: 一覧とビューを閉じる
+  nnoremap <buffer> q :silent call <SID>CloseAll()<CR>
+
+endfunction
+
+" -------
+
+function! s:CloseAll() abort
+  " ビューバッファを閉じる
+  let view_buf = bufnr('[SimplyNoteView]')
+  if view_buf != -1
+    execute 'bwipeout! ' . view_buf
+  endif
+
+  " リストバッファ自身を閉じる
+  let list_buf = bufnr('[SimplyNoteList]')
+  if list_buf != -1
+    execute 'bwipeout! ' . list_buf
+  endif
 endfunction
 
 " -------
