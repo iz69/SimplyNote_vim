@@ -214,14 +214,29 @@ function! SimplyNote#update() abort
   
   " --- 一覧行を組み立て ---
   let lines = []
-  " (中略: 表示整形ロジックは変更なし)
+
   for note in notes
+
     let title = get(note, 'title', '[No Title]')
+
     let tags = get(note, 'tags', [])
     let tag_str = len(tags) > 0 ? '[#' . join(tags, '|#') . ']' : ''
-    let has_files = has_key(note, 'files') && type(note.files) == v:t_list && len(note.files) > 0
-    let file_mark = has_files ? ' [*]' : ''
+
+"    let has_files = has_key(note, 'files') && type(note.files) == v:t_list && len(note.files) > 0
+"    let file_mark = has_files ? ' [+]' : ''
+
+    let file_count = (has_key(note, 'files') && type(note.files) == v:t_list)
+        \ ? len(note.files)
+        \ : 0
+    let file_mark = file_count > 0 ? '[+'.file_count.']' : ''
+
+    " --- 重要フラグ（[*]）---
+"    let star_mark = (get(note, 'is_important', 0) == 1) ? '[*]' : ''
+    let isimp = str2nr(get(note, 'is_important', 0))
+    let star_mark = (isimp == 1) ? '[*]' : ''
+
     let datetime = get(note, 'updated_at', get(note, 'created_at', ''))
+
     if datetime !=# ''
       let parts = split(datetime, 'T')
       if len(parts) == 2
@@ -235,12 +250,22 @@ function! SimplyNote#update() abort
       let datetime = '[????-??-?? ??:??]'
     endif
   
-    let termwidth = &columns - 2
     let left = title
     if tag_str !=# ''
       let left .= ' ' . tag_str
     endif
-    let right = (file_mark !=# '' ? file_mark . ' ' : '') . datetime
+
+    " --- 右（file_mark → star_mark → datetime）---
+    let right = ''
+    if file_mark !=# ''
+      let right .= file_mark
+    endif
+    if star_mark !=# ''
+      let right .= star_mark
+    endif
+    let right .= datetime
+
+    let termwidth = &columns - 2
     let spaces = max([1, termwidth - strdisplaywidth(left) - strdisplaywidth(right)])
     call add(lines, left . repeat(' ', spaces) . right)
   endfor
@@ -279,14 +304,27 @@ function! SimplyNote#list() abort
   " --- ノート一覧を更新 ---
   call SimplyNote#update()
 
-  " --- ハイライト設定 ---
+  " --- 表示設定 ---
   silent! syntax clear SimplyNoteTag
-  silent! syntax clear SimplyNoteFileMark
+"  silent! syntax clear SimplyNoteFileMark
+  silent! syntax clear SimplyNoteFileCount
+  silent! syntax clear SimplyNoteImportant
   silent! syntax clear SimplyNoteDatetime
+
   syntax match SimplyNoteTag /\v\[#([^\]]+)\]/
   highlight def link SimplyNoteTag Type
-  syntax match SimplyNoteFileMark /\v\[\*\]/
-  highlight def link SimplyNoteFileMark Constant
+
+"  syntax match SimplyNoteFileMark /\v\[\*\]/
+"  highlight def link SimplyNoteFileMark Constant
+
+"  syntax match SimplyNoteFileCount /\v\[\+\d+\]/
+  syntax match SimplyNoteFileCount /\[\+\d\+\]/
+  highlight def link SimplyNoteFileCount Constant
+
+"  syntax match SimplyNoteImportant /\v\[\*\]/
+  syntax match SimplyNoteImportant /\[\*\]/
+  highlight def link SimplyNoteImportant Special
+
   syntax match SimplyNoteDatetime /\v\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}\]/
   highlight def link SimplyNoteDatetime Comment
 
@@ -310,7 +348,7 @@ function! SimplyNote#list() abort
   augroup END
  
   " u: SimplyNoteUpdate
-  nnoremap <buffer> u :silent call SimplyNoote#update()<CR>
+  nnoremap <buffer> u :silent call SimplyNote#update()<CR>
 
   " e: Viewへ移動してSimplyNoteEdit実行
   nnoremap <buffer> e :silent call <SID>GotoView()<Bar>SimplyNoteEdit<CR>
@@ -401,7 +439,13 @@ function! SimplyNote#open() abort
   let b:simplynote_files = get(note, 'files', [])
   
   let title = get(note, 'title', '[No Title]')
-  let content = split(get(note, 'content', ''), '\n')
+
+  " 改行コード(念の為)
+"  let content = split(get(note, 'content', ''), '\n')
+  let raw = get(note, 'content', '')
+  let cleaned = substitute(raw, '\r', '', 'g')
+  let content = split(cleaned, '\n')
+
   call setline(1, [title, repeat('─', strdisplaywidth(title))] + content)
 
   " --- 添付ファイルを表示 ---
