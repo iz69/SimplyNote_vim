@@ -235,27 +235,37 @@ function! SimplyNote#update() abort
     let isimp = str2nr(get(note, 'is_important', 0))
     let star_mark = (isimp == 1) ? '[*]' : ''
 
-    let datetime = get(note, 'updated_at', get(note, 'created_at', ''))
+"    let datetime = get(note, 'updated_at', get(note, 'created_at', ''))
+"
+"    if datetime !=# ''
+"      let parts = split(datetime, 'T')
+"      if len(parts) == 2
+"        let date = parts[0]
+"        let time = substitute(parts[1], '\..*', '', '')
+"        let datetime = printf('[%s %s]', date, time)
+"      else
+"        let datetime = '[' . datetime . ']'
+"      endif
+"    else
+"      let datetime = '[????-??-?? ??:??]'
+"    endif
 
-    if datetime !=# ''
-      let parts = split(datetime, 'T')
-      if len(parts) == 2
-        let date = parts[0]
-        let time = substitute(parts[1], '\..*', '', '')
-        let datetime = printf('[%s %s]', date, time)
-      else
-        let datetime = '[' . datetime . ']'
-      endif
+    let datetime_str = get(note, 'updated_at', get(note, 'created_at', ''))
+
+    if datetime_str !=# ''
+      let local = <SID>ToLocalTime(datetime_str)
+      let datetime = '[' . local . ']'
     else
       let datetime = '[????-??-?? ??:??]'
     endif
-  
+
+    " 左詰め タイトル タグ
     let left = title
     if tag_str !=# ''
       let left .= ' ' . tag_str
     endif
 
-    " --- 右（file_mark → star_mark → datetime）---
+    " 右詰め 添付・Star・日付
     let right = ''
     if file_mark !=# ''
       let right .= file_mark
@@ -282,6 +292,23 @@ function! SimplyNote#update() abort
   " --- バッファを保存済み扱いに ---
   setlocal nomodified
 
+endfunction
+
+
+function! s:ToLocalTime(utc_str) abort
+  if empty(a:utc_str)
+    return ''
+  endif
+
+  " Python 表現として安全に変換（クォートエスケープ含む）
+  let py_utc = string(a:utc_str)
+
+  " Python 式を 1 行の文字列で作成
+  let py = "__import__('datetime').datetime.fromisoformat(" ..
+        \ py_utc ..
+        \ ".replace('Z', '+00:00')).astimezone().strftime('%Y-%m-%d %H:%M:%S')"
+
+  return py3eval(py)
 endfunction
 
 " ------------------------------------------------------------------
