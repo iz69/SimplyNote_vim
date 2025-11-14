@@ -231,10 +231,10 @@ function! SimplyNote#update() abort
         \ : 0
     let file_mark = file_count > 0 ? '[+'.file_count.']' : ''
 
-    " --- 重要フラグ（[*]）---
+    " 重要フラグ
 "    let star_mark = (get(note, 'is_important', 0) == 1) ? '[*]' : ''
     let isimp = str2nr(get(note, 'is_important', 0))
-    let star_mark = (isimp == 1) ? '[*]' : ''
+    let star_mark = (isimp == 1) ? '* ' : '  '
 
     let datetime_str = get(note, 'updated_at', get(note, 'created_at', ''))
 
@@ -331,15 +331,11 @@ function! SimplyNote#list() abort
   syntax match SimplyNoteTag /\v\[#([^\]]+)\]/
   highlight def link SimplyNoteTag Type
 
-"  syntax match SimplyNoteFileMark /\v\[\*\]/
-"  highlight def link SimplyNoteFileMark Constant
-
-"  syntax match SimplyNoteFileCount /\v\[\+\d+\]/
   syntax match SimplyNoteFileCount /\[\+\d\+\]/
   highlight def link SimplyNoteFileCount Constant
 
-"  syntax match SimplyNoteImportant /\v\[\*\]/
-  syntax match SimplyNoteImportant /\[\*\]/
+"  syntax match SimplyNoteImportant /\[\*\]/
+  syntax match SimplyNoteImportant /^\*/
   highlight def link SimplyNoteImportant Special
 
   syntax match SimplyNoteDatetime /\v\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}\]/
