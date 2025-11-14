@@ -217,7 +217,8 @@ function! SimplyNote#update() abort
 
   for note in notes
 
-    let title = get(note, 'title', '[No Title]')
+"    let title = get(note, 'title', '[No Title]')
+    let title = empty(get(note, 'title', '')) ? '[No Title]' : get(note, 'title', '')
 
     let tags = get(note, 'tags', [])
     let tag_str = len(tags) > 0 ? '[#' . join(tags, '|#') . ']' : ''
@@ -260,7 +261,15 @@ function! SimplyNote#update() abort
     endif
 
     " 左詰め タイトル タグ
-    let left = title
+"    let left = title
+"    if tag_str !=# ''
+"      let left .= ' ' . tag_str
+"    endif
+    let left = ''
+    if star_mark !=# ''
+      let left .= star_mark
+    endif
+    let left .= title
     if tag_str !=# ''
       let left .= ' ' . tag_str
     endif
@@ -270,9 +279,9 @@ function! SimplyNote#update() abort
     if file_mark !=# ''
       let right .= file_mark
     endif
-    if star_mark !=# ''
-      let right .= star_mark
-    endif
+"    if star_mark !=# ''
+"      let right .= star_mark
+"    endif
     let right .= datetime
 
     let termwidth = &columns - 2
