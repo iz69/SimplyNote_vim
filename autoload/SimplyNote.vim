@@ -236,21 +236,6 @@ function! SimplyNote#update() abort
     let isimp = str2nr(get(note, 'is_important', 0))
     let star_mark = (isimp == 1) ? '[*]' : ''
 
-"    let datetime = get(note, 'updated_at', get(note, 'created_at', ''))
-"
-"    if datetime !=# ''
-"      let parts = split(datetime, 'T')
-"      if len(parts) == 2
-"        let date = parts[0]
-"        let time = substitute(parts[1], '\..*', '', '')
-"        let datetime = printf('[%s %s]', date, time)
-"      else
-"        let datetime = '[' . datetime . ']'
-"      endif
-"    else
-"      let datetime = '[????-??-?? ??:??]'
-"    endif
-
     let datetime_str = get(note, 'updated_at', get(note, 'created_at', ''))
 
     if datetime_str !=# ''
@@ -260,11 +245,7 @@ function! SimplyNote#update() abort
       let datetime = '[????-??-?? ??:??]'
     endif
 
-    " 左詰め タイトル タグ
-"    let left = title
-"    if tag_str !=# ''
-"      let left .= ' ' . tag_str
-"    endif
+    " 左詰め Star タイトル タグ
     let left = ''
     if star_mark !=# ''
       let left .= star_mark
@@ -274,7 +255,7 @@ function! SimplyNote#update() abort
       let left .= ' ' . tag_str
     endif
 
-    " 右詰め 添付・Star・日付
+    " 右詰め 添付 日付
     let right = ''
     if file_mark !=# ''
       let right .= file_mark
@@ -296,7 +277,7 @@ function! SimplyNote#update() abort
   setlocal nomodifiable cursorline nowrap
   normal! gg
   
-  let v:statusmsg = "🔄 ノート一覧を更新しました。"
+  let v:statusmsg = "🔄 Updated Note List"
   
   " --- バッファを保存済み扱いに ---
   setlocal nomodified
@@ -370,7 +351,7 @@ function! SimplyNote#list() abort
     silent! noautocmd enew
     silent! noautocmd setlocal buftype= bufhidden=hide noswapfile norelativenumber
     silent! noautocmd file [SimplyNoteView]
-    silent! call setline(1, ['（リストからノートを選択してください）'])
+    silent! call setline(1, [' (Please select a note from the list.)'])
     silent! wincmd k
   else
     execute 'belowright split | buffer ' . view_buf
@@ -477,7 +458,6 @@ function! SimplyNote#open() abort
   let title = get(note, 'title', '[No Title]')
 
   " 改行コード(念の為)
-"  let content = split(get(note, 'content', ''), '\n')
   let raw = get(note, 'content', '')
   let cleaned = substitute(raw, '\r', '', 'g')
   let content = split(cleaned, '\n')
@@ -592,7 +572,7 @@ function! SimplyNote#save() abort
 
   " --- トークン確認＆自動ログイン ---
   if !<SID>ensure_auth()
-    echohl ErrorMsg | echo "ログイン情報が未設定、または自動ログインに失敗しました。" | echohl None
+    echohl ErrorMsg | echo "Login information is not configured, or automatic login has failed." | echohl None
     return
   endif
 
@@ -600,7 +580,7 @@ function! SimplyNote#save() abort
   " (中略: 内容取得ロジックは変更なし)
   let lines = getline(1, '$')
   if empty(lines)
-    echohl WarningMsg | echo "空のノートは保存できません。" | echohl None
+    echohl WarningMsg | echo "An empty note cannot be saved." | echohl None
     return
   endif
   
@@ -619,7 +599,7 @@ function! SimplyNote#save() abort
   " 1行目をタイトル、2行目以降を本文として分割
   let l:title = trim(get(lines, 0, ''))
   if empty(l:title)
-    let l:title = '新しいノート'
+    let l:title = 'New Note'
   endif
   
   " 1行目をタイトル、2行目が罫線ならスキップ
@@ -665,7 +645,7 @@ function! SimplyNote#save() abort
       let opts.headers = {'Authorization': 'Bearer ' . g:simplynote_token, 'Content-Type': 'application/json; charset=utf-8'}
       let l:res = SimplyNote#request(l:path, opts)
     else
-      echohl ErrorMsg | echo "トークンが失効しました。再ログインに失敗。" | echohl None
+      echohl ErrorMsg | echo "Your token has expired. Automatic re-login failed." | echohl None
       return
     endif
   endif
@@ -676,9 +656,9 @@ function! SimplyNote#save() abort
     let b:simplynote_id = l:res.id
     let b:simplynote_title = l:res.title
     if l:method ==# 'POST'
-      echo "🆕 新しいノートを作成しました: " . l:res.title
+      echo "🆕 Create a new note: " . l:res.title
     else
-      echo "💾 ノートを更新しました: " . l:res.title
+      echo "💾 Updated the note: " . l:res.title
     endif
 
     " View バッファの保護を一時的に解除
@@ -701,9 +681,9 @@ function! SimplyNote#save() abort
     call SimplyNote#refresh(b:simplynote_id)
 
   elseif has_key(l:res, 'error')
-    echohl ErrorMsg | echo "ノート保存エラー: " . l:res.error | echohl None
+    echohl ErrorMsg | echo "Note save error: " . l:res.error | echohl None
   else
-    echohl ErrorMsg | echo "ノート保存に失敗しました。" | echohl None
+    echohl ErrorMsg | echo "Failed to save the note." | echohl None
   endif
  
 endfunction
@@ -755,14 +735,14 @@ function! SimplyNote#new() abort
 "  setlocal modifiable buftype=nofile bufhidden=hide swapfile norelativenumber
   setlocal modifiable buftype= bufhidden=hide swapfile norelativenumber
   silent! %delete _
-  call setline(1, ['新しいノート', ''])
+  call setline(1, ['New Note', ''])
 
   " 新規なのでメタ情報は消す
   unlet! b:simplynote_id b:simplynote_title b:simplynote_tags b:simplynote_files
 
   " ここで保存済み扱いにしてから編集を促す（任意）
   setlocal nomodified
-  echo "📝 新規ノートを作成します。:w で保存（サーバーへ送信）できます。"
+  echo "📝 Creating a new note. Use :w save it."
 
   " :w 後のサーバ保存フック
   augroup SimplyNoteWriteHook
@@ -778,16 +758,16 @@ endfunction
 " 削除（確認→DELETE→一覧更新）
 function! SimplyNote#delete() abort
   if !exists('b:simplynote_id')
-    echohl WarningMsg | echo "このノートにはIDがありません（未保存の可能性）。" | echohl None
+    echohl WarningMsg | echo "This note has no ID.(it may not have been saved)" | echohl None
     return
   endif
-  if confirm('本当に削除しますか？', "&Yes\n&No", 2) != 1
+  if confirm('Are you sure you want to delete it', "&Yes\n&No", 2) != 1
     return
   endif
   
   " --- トークン確認＆自動ログイン ---
   if !<SID>ensure_auth()
-    echohl ErrorMsg | echo "未ログインです。または自動ログインに失敗しました。" | echohl None
+    echohl ErrorMsg | echo "You are not logged in, or automatic login has failed." | echohl None
     return
   endif
   
@@ -802,19 +782,19 @@ function! SimplyNote#delete() abort
       let opts.headers = {'Authorization': 'Bearer ' . g:simplynote_token}
       let res = SimplyNote#request('/notes/' . b:simplynote_id, opts)
     else
-      echohl ErrorMsg | echo "トークンが失効しました。再ログインに失敗。" | echohl None
+      echohl ErrorMsg | echo "Your token has expired. Automatic re-login failed." | echohl None
       return
     endif
   endif
 
-  echo "🗑️ ノートを削除しました。"
+  echo "🗑️ The note has been deleted."
   " ビューをクリアして一覧更新
   silent! %delete _
-  call setline(1, ['（リストからノートを選択してください）'])
+  call setline(1, [' (Please select a note from the list.)'])
   call SimplyNote#refresh('')
   
   if type(res)==type({}) && (get(res,'error','') != '' || get(res,'status',200) >= 400)
-    echohl ErrorMsg | echo "ノート削除に失敗しました。" | echohl None
+    echohl ErrorMsg | echo "Failed to delete the note." | echohl None
   endif
 endfunction
 

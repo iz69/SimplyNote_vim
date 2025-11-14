@@ -10,4 +10,4 @@ command! -nargs=0 SimplyNoteUpdate call SimplyNote#update()
 command! -nargs=0 SimplyNoteSave   call SimplyNote#save()
 command! -nargs=0 SimplyNoteEdit   call SimplyNote#edit()
 
-" need python37 
+" need python37
