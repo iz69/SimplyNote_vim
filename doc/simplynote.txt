@@ -1,0 +1,173 @@
+*simplynote.txt*    SimplyNote Vim plugin
+
+                     SIMPLENOTE.VIM   Last change: 2025-11-10
+
+==============================================================================
+INTRODUCTION                                                        *simplynote*
+
+SimplyNote is a Vim/Neovim plugin that connects to a SimplyNote server
+(FastAPI backend) to browse, view, edit, create, and delete notes directly
+inside Vim.
+
+The plugin provides a two-pane UI:
+- A note list buffer: [SimplyNoteList]
+- A note viewer/editor buffer: [SimplyNoteView]
+
+It supports token authentication, automatic re-login, tag filtering, and
+server-side note updates.
+
+This help covers commands, mappings, configuration, and workflow.
+
+==============================================================================
+COMMANDS                                                         *simplynote-commands*
+
+The following user commands are provided:
+
+:SimplyNoteList                                                   *:SimplyNoteList*
+    Open the note list pane. Creates the buffer if needed.
+    Automatically fetches notes from the server.
+
+:SimplyNoteUpdate                                                 *:SimplyNoteUpdate*
+    Refresh the note list and update the display.
+
+:SimplyNoteOpen                                                   *:SimplyNoteOpen*
+    Open the note under the cursor from the list pane.
+
+:SimplyNoteEdit                                                   *:SimplyNoteEdit*
+    Enable edit mode in the view buffer.  
+    The buffer becomes modifiable and can be written with :w.
+
+:SimplyNoteSave                                                   *:SimplyNoteSave*
+    Save changes to the server using POST/PUT as appropriate.
+
+:SimplyNoteNew                                                    *:SimplyNoteNew*
+    Create a new note and open it in the view buffer.
+
+:SimplyNoteDelete                                                 *:SimplyNoteDelete*
+    Delete the currently opened note.
+
+:SNLogin {username} {password}                                    *:SNLogin*
+    Perform login manually.  
+    The access token will be stored in |g:simplynote_token|.
+
+==============================================================================
+KEY MAPPINGS                                                  *simplynote-mappings*
+
+Inside the note list buffer ([SimplyNoteList]):
+
+u       Refresh the note list (same as :SimplyNoteUpdate).
+e       Move to the view buffer and begin editing (:SimplyNoteEdit).
+q       Close both list and view buffers.
+
+Inside the view buffer ([SimplyNoteView]):
+
+:w      Save changes to the server (:SimplyNoteSave).
+
+gx, <C-LeftMouse>
+        Open URLs in the default browser (xdg-open / start).
+
+==============================================================================
+CONFIGURATION                                               *simplynote-configuration*
+
+Global variables controlling plugin behavior:
+
+*g:simplynote_api_url*
+    Base URL of the SimplyNote server.
+    Default: "http://localhost:8000"
+
+*g:simplynote_username*
+    Username for automatic login.
+
+*g:simplynote_password*
+    Password for automatic login.
+
+*g:simplynote_token*
+    Access token. Automatically updated on successful login.
+
+*g:simplynote_debug*
+    If non-zero, verbose debug messages will be shown.
+
+------------------------------------------------------------------------------
+AUTOMATIC LOGIN                                             *simplynote-auth*
+
+Whenever SimplyNote performs an API request, it checks for a valid token.
+If missing or expired:
+1. Attempts login using g:simplynote_username/password
+2. Retries the request
+3. If still failing, displays an error
+
+------------------------------------------------------------------------------
+NOTE LIST BUFFER                                             *simplynote-list*
+
+Buffer name:
+    [SimplyNoteList]
+
+Displayed format:
+    * Title
+    * Tags (#tag1|#tag2)
+    * File count [+N]
+    * Updated date [YYYY-MM-DD HH:MM]
+
+Notes tagged “trash” are automatically hidden.
+
+------------------------------------------------------------------------------
+NOTE VIEW BUFFER                                             *simplynote-view*
+
+Buffer name:
+    [SimplyNoteView]
+
+Layout:
+    Title
+    ────────
+    Content...
+    (optional)
+    --- Attached files ---
+    - filename (URL)
+
+The view buffer is readonly except during edit mode.
+
+==============================================================================
+WORKFLOW                                                  *simplynote-workflow*
+
+Typical usage:
+
+1. :SimplyNoteList  
+   Open the list buffer.
+
+2. Move cursor to a note.  
+   Preview opens automatically in the lower window.
+
+3. Press e  
+   Switch to edit mode.
+
+4. Edit content and use :w  
+   The note is saved to the server.
+
+5. q  
+   Close the SimplyNote session.
+
+Creating a new note:
+    :SimplyNoteNew → edit → :w
+
+Deleting a note:
+    :SimplyNoteDelete
+
+==============================================================================
+DEVELOPER NOTES                                          *simplynote-developer*
+
+Internally, the plugin communicates via Python3 using urllib with a custom
+JSON-aware response handler.  
+The plugin uses BufWriteCmd autocommands and buffer-local metadata variables.
+
+Source structure:
+    plugin/SimplyNote.vim
+    autoload/SimplyNote.vim
+
+==============================================================================
+LICENSE                                                          *simplynote-license*
+
+This plugin is provided under the MIT License.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:
+

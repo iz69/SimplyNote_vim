@@ -173,7 +173,7 @@ function! SimplyNote#update() abort
 
   " --- トークン確認＆自動ログイン ---
   if !<SID>ensure_auth()
-    echohl ErrorMsg | echo "ログイン情報が未設定、または自動ログインに失敗しました。" | echohl None
+    echohl ErrorMsg | echo "Login information is not configured, or automatic login has failed." | echohl None
     return
   endif
   
@@ -192,7 +192,7 @@ function! SimplyNote#update() abort
       let opts.headers = {'Authorization': 'Bearer ' . g:simplynote_token}
       let res = SimplyNote#request('/notes', opts)
     else
-      echohl ErrorMsg | echo "トークンが失効しました。再ログインに失敗。" | echohl None
+      echohl ErrorMsg | echo "Your token has expired. Automatic re-login failed." | echohl None
       return
     endif
   endif
@@ -201,7 +201,7 @@ function! SimplyNote#update() abort
   let notes = type(res) == type([]) ? res : (has_key(res, 'notes') ? res.notes : [])
 
   if empty(notes)
-    echohl ErrorMsg | echo "ノート一覧の取得に失敗しました。" | echohl None
+    echohl ErrorMsg | echo "Failed to retrieve the note list." | echohl None
     return
   endif
 
