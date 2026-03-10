@@ -8,10 +8,42 @@ function! SimplyNote#log(msg) abort
   endif
 endfunction
 
+" Python3 provider is mandatory for HTTP and time conversion.
+function! s:require_python3() abort
+  if has('python3')
+    return 1
+  endif
+
+  echohl ErrorMsg
+  echo 'SimplyNote requires Vim/Neovim with +python3 support.'
+  echohl None
+  return 0
+endfunction
+
+" Use Python's urllib.parse.urlencode so credentials are encoded correctly.
+function! s:urlencode_form(data) abort
+  if !<SID>require_python3()
+    return ''
+  endif
+
+  let g:_simplynote_form_data = a:data
+  py3 << EOF
+import urllib.parse
+
+vim.vars['_simplynote_form_encoded'] = urllib.parse.urlencode(
+    {str(k): str(v) for k, v in vim.vars['_simplynote_form_data'].items()}
+)
+EOF
+  return get(g:, '_simplynote_form_encoded', '')
+endfunction
+
 " ------------------------------------------------------------------
 
 " HTTP通信（Python連携）
 function! SimplyNote#request(path, opts) abort
+  if !<SID>require_python3()
+    return {'error': 'python3_unavailable'}
+  endif
 
   let base_url = substitute(get(g:, 'simplynote_api_url', 'http://localhost:8000'), '/$', '', '')
   let url     = base_url . a:path
@@ -115,7 +147,7 @@ function! s:ensure_auth() abort
     return 0
   endif
 
-  call SimplyNote#login(user, pass)
+  call SimplyNote#login(user, pass, {'silent': 1})
 
   if exists('g:simplynote_token') && !empty(g:simplynote_token)
     return 1
@@ -128,10 +160,16 @@ endfunction
 
 " ログイン処理
 function! SimplyNote#login(...) abort
+  let l:args = copy(a:000)
+  let l:opts = (!empty(l:args) && type(l:args[-1]) == v:t_dict) ? remove(l:args, -1) : {}
+  let l:silent = get(l:opts, 'silent', 0)
 
-  if a:0 >= 2
-    let username = a:1
-    let password = a:2
+  if len(l:args) >= 2
+    let username = l:args[0]
+    let password = l:args[1]
+  elseif len(l:args) == 1
+    echohl ErrorMsg | echo 'SNLogin expects either 0 or 2 arguments.' | echohl None
+    return
   else
     let username = get(g:, 'simplynote_username', '')
     let password = get(g:, 'simplynote_password', '')
@@ -142,7 +180,10 @@ function! SimplyNote#login(...) abort
     return
   endif
   
-  let body = 'username=' . username . '&password=' . password
+  let body = <SID>urlencode_form({'username': username, 'password': password})
+  if body ==# ''
+    return
+  endif
   let opts = {
   \ 'method': 'POST',
   \ 'headers': {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -153,11 +194,11 @@ function! SimplyNote#login(...) abort
   
   if has_key(res, 'access_token')
     let g:simplynote_token = res['access_token']
-    if a:0 < 2 " :SNLogin コマンドなどで明示的に実行された場合のみメッセージ表示
+    if !l:silent
       echo "✅ Login successful"
     endif
   else
-    if a:0 < 2
+    if !l:silent
       echohl ErrorMsg | echo "Login failed" | echohl None
       if has_key(res, 'error')
         echom 'Error detail: ' . res['error']
@@ -200,7 +241,7 @@ function! SimplyNote#update() abort
 
   let notes = type(res) == type([]) ? res : (has_key(res, 'notes') ? res.notes : [])
 
-  if empty(notes)
+  if type(res) == type({}) && (get(res, 'error', '') !=# '' || get(res, 'status', 0) >= 400)
     echohl ErrorMsg | echo "Failed to retrieve the note list." | echohl None
     return
   endif
@@ -214,6 +255,9 @@ function! SimplyNote#update() abort
   
   " --- 一覧行を組み立て ---
   let lines = []
+  if empty(notes)
+    call add(lines, '(No notes found)')
+  endif
 
   for note in notes
 
@@ -288,6 +332,10 @@ endfunction
 function! s:ToLocalTime(utc_str) abort
   if empty(a:utc_str)
     return ''
+  endif
+
+  if !has('python3')
+    return substitute(a:utc_str, 'T', ' ', '')
   endif
 
   " Python 表現として安全に変換（クォートエスケープ含む）
@@ -376,6 +424,12 @@ endfunction
 function! s:CloseAll() abort
   " ビューバッファを閉じる
   let view_buf = bufnr('[SimplyNoteView]')
+  if view_buf != -1 && getbufvar(view_buf, '&modified')
+    if confirm('Discard unsaved changes in SimplyNote view?', "&Yes\n&No", 2) != 1
+      return
+    endif
+  endif
+
   if view_buf != -1
     execute 'bwipeout! ' . view_buf
   endif
@@ -783,14 +837,14 @@ function! SimplyNote#delete() abort
     endif
   endif
 
+  if type(res)==type({}) && (get(res,'error','') != '' || get(res,'status',200) >= 400)
+    echohl ErrorMsg | echo "Failed to delete the note." | echohl None
+    return
+  endif
+
   echo "🗑️ The note has been deleted."
   " ビューをクリアして一覧更新
   silent! %delete _
   call setline(1, [' (Please select a note from the list.)'])
   call SimplyNote#refresh('')
-  
-  if type(res)==type({}) && (get(res,'error','') != '' || get(res,'status',200) >= 400)
-    echohl ErrorMsg | echo "Failed to delete the note." | echohl None
-  endif
 endfunction
-

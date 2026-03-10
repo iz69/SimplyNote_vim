@@ -9,6 +9,10 @@ SimplyNote is a Vim/Neovim plugin that connects to a SimplyNote server
 (FastAPI backend) to browse, view, edit, create, and delete notes directly
 inside Vim.
 
+Requirements:
+- Vim/Neovim with Python3 support enabled
+- A reachable SimplyNote server API
+
 The plugin provides a two-pane UI:
 - A note list buffer: [SimplyNoteList]
 - A note viewer/editor buffer: [SimplyNoteView]
@@ -46,8 +50,9 @@ The following user commands are provided:
 :SimplyNoteDelete                                                 *:SimplyNoteDelete*
     Delete the currently opened note.
 
-:SNLogin {username} {password}                                    *:SNLogin*
-    Perform login manually.  
+:SNLogin [username] [password]                                    *:SNLogin*
+    Perform login manually. If omitted, uses
+    |g:simplynote_username| and |g:simplynote_password|.  
     The access token will be stored in |g:simplynote_token|.
 
 ==============================================================================
@@ -109,6 +114,7 @@ Displayed format:
     * Updated date [YYYY-MM-DD HH:MM]
 
 Notes tagged “trash” are automatically hidden.
+If no notes are available, the list shows "(No notes found)".
 
 ------------------------------------------------------------------------------
 NOTE VIEW BUFFER                                             *simplynote-view*
@@ -170,4 +176,3 @@ This plugin is provided under the MIT License.
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:
-
