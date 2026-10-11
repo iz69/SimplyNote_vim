@@ -1,6 +1,6 @@
 *simplynote.txt*    SimplyNote Vim plugin
 
-                     SIMPLENOTE.VIM   Last change: 2025-11-10
+                     SIMPLENOTE.VIM   Last change: 2026-10-11
 
 ==============================================================================
 INTRODUCTION                                                        *simplynote*
@@ -17,8 +17,8 @@ The plugin provides a two-pane UI:
 - A note list buffer: [SimplyNoteList]
 - A note viewer/editor buffer: [SimplyNoteView]
 
-It supports token authentication, automatic re-login, tag filtering, and
-server-side note updates.
+It supports token authentication, automatic re-login, tag display, Trash
+filtering, and server-side note updates.
 
 This help covers commands, mappings, configuration, and workflow.
 
@@ -61,6 +61,9 @@ KEY MAPPINGS                                                  *simplynote-mappin
 Inside the note list buffer ([SimplyNoteList]):
 
 u       Refresh the note list (same as :SimplyNoteUpdate).
+J       Scroll the view down without leaving the note list.
+K       Scroll the view up without leaving the note list.
+        A count can be given, for example 5J or 5K.
 e       Move to the view buffer and begin editing (:SimplyNoteEdit).
 q       Close both list and view buffers.
 
@@ -111,7 +114,7 @@ Displayed format:
     * Title
     * Tags (#tag1|#tag2)
     * File count [+N]
-    * Updated date [YYYY-MM-DD HH:MM]
+    * Updated date [YYYY-MM-DD HH:MM:SS]
 
 Notes tagged “trash” are automatically hidden.
 If no notes are available, the list shows "(No notes found)".

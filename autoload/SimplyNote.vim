@@ -19,6 +19,33 @@ function! s:require_python3() abort
   return 0
 endfunction
 
+" Encode application/x-www-form-urlencoded values safely.
+function! s:urlencode_form(data) abort
+  if !<SID>require_python3()
+    return ''
+  endif
+
+  let g:_simplynote_form_data = a:data
+  py3 << EOF
+import urllib.parse
+
+def _simplynote_form_str(value):
+    if isinstance(value, (bytes, bytearray)):
+        return value.decode('utf-8')
+    return str(value)
+
+form_data = vim.vars['_simplynote_form_data']
+vim.vars['_simplynote_form_encoded'] = urllib.parse.urlencode({
+    _simplynote_form_str(key): _simplynote_form_str(value)
+    for key, value in form_data.items()
+})
+EOF
+
+  let encoded = get(g:, '_simplynote_form_encoded', '')
+  unlet! g:_simplynote_form_data g:_simplynote_form_encoded
+  return encoded
+endfunction
+
 " ------------------------------------------------------------------
 
 " HTTP通信（Python連携）
@@ -168,7 +195,10 @@ function! SimplyNote#login(...) abort
     return
   endif
   
-  let body = 'username=' . username . '&password=' . password
+  let body = <SID>urlencode_form({'username': username, 'password': password})
+  if body ==# ''
+    return
+  endif
   let opts = {
   \ 'method': 'POST',
   \ 'headers': {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -301,6 +331,7 @@ function! SimplyNote#update() abort
   
   " --- 現在バッファに反映 ---
   setlocal modifiable
+  silent! %delete _
   call setline(1, lines)
   let b:simplynote_notes = notes
   setlocal nomodifiable cursorline nowrap
@@ -371,7 +402,7 @@ function! SimplyNote#list() abort
   syntax match SimplyNoteImportant /^\*/
   highlight def link SimplyNoteImportant Special
 
-  syntax match SimplyNoteDatetime /\v\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}\]/
+  syntax match SimplyNoteDatetime /\v\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]/
   highlight def link SimplyNoteDatetime Comment
 
   " --- 下ペイン（本文） ---
@@ -381,6 +412,7 @@ function! SimplyNote#list() abort
     silent! noautocmd setlocal buftype= bufhidden=hide noswapfile norelativenumber
     silent! noautocmd file [SimplyNoteView]
     silent! call setline(1, [' (Please select a note from the list.)'])
+    silent! setlocal nomodified
     silent! wincmd k
   else
     execute 'belowright split | buffer ' . view_buf
@@ -396,12 +428,38 @@ function! SimplyNote#list() abort
   " u: SimplyNoteUpdate
   nnoremap <buffer> u :silent call SimplyNote#update()<CR>
 
+  " J/K: scroll the view while keeping focus in the note list
+  nnoremap <buffer> J :<C-u>call <SID>ScrollView(v:count1)<CR>
+  nnoremap <buffer> K :<C-u>call <SID>ScrollView(-v:count1)<CR>
+
   " e: Viewへ移動してSimplyNoteEdit実行
   nnoremap <buffer> e :silent call <SID>GotoView()<Bar>SimplyNoteEdit<CR>
 
   " q: 一覧とビューを閉じる
   nnoremap <buffer> q :silent call <SID>CloseAll()<CR>
 
+endfunction
+
+" -------
+
+function! s:ScrollView(lines) abort
+  let view_buf = bufnr('[SimplyNoteView]')
+  let view_winid = (view_buf == -1) ? -1 : bufwinid(view_buf)
+
+  if view_winid == -1
+    echohl WarningMsg
+    echo 'SimplyNote view is not visible.'
+    echohl None
+    return
+  endif
+
+  let view_info = getwininfo(view_winid)[0]
+  let last_line = len(getbufline(view_buf, 1, '$'))
+  let max_topline = max([1, last_line - view_info.height + 1])
+  let target_topline = min([max_topline,
+        \ max([1, view_info.topline + a:lines])])
+
+  call win_execute(view_winid, 'normal! ' . target_topline . 'Gzt')
 endfunction
 
 " -------
@@ -463,6 +521,14 @@ function! SimplyNote#open() abort
   let view_buf = bufnr('[SimplyNoteView]')
   let view_win = (view_buf == -1) ? -1 : bufwinnr(view_buf)
 
+  " Do not overwrite unsaved edits during automatic preview.
+  if view_buf != -1 && getbufvar(view_buf, '&modified')
+    echohl WarningMsg
+    echo 'Preview paused because the SimplyNote view has unsaved changes.'
+    echohl None
+    return
+  endif
+
   if view_win == -1
     " ウィンドウが無い → 分割して表示する
     belowright split
@@ -487,6 +553,7 @@ function! SimplyNote#open() abort
   let b:simplynote_id = note.id
   let b:simplynote_title = note.title
   let b:simplynote_tags = get(note, 'tags', [])
+  unlet! b:simplynote_attached_lines
   let b:simplynote_files = get(note, 'files', [])
   
   let title = get(note, 'title', '[No Title]')
@@ -566,6 +633,8 @@ function! SimplyNote#edit() abort
     return
   endif
 
+  setlocal modifiable noreadonly
+
   " 添付ファイルセクションを削除し、バックアップする
   let l:lines = getline(1, '$')
   let l:attach_idx = -1
@@ -581,9 +650,7 @@ function! SimplyNote#edit() abort
     " 添付ファイルセクションをバッファローカル変数にバックアップ
     let b:simplynote_attached_lines = l:lines[l:attach_idx - 1:]
     " バッファから添付ファイルセクションを削除
-    setlocal modifiable " 削除のために modifiable に設定
     silent! execute l:attach_idx . ',$delete _'
-    setlocal nomodifiable " 一旦 nomodifiable に戻す
   else
     " 添付ファイルがなければバックアップ変数を消しておく
     unlet! b:simplynote_attached_lines
@@ -595,7 +662,6 @@ function! SimplyNote#edit() abort
     silent! 2delete _
   endif
 
-  setlocal modifiable noreadonly
   echo "✏️  Edit mode enabled.  Use :SimplyNoteSave to update."
 
 endfunction
@@ -755,6 +821,12 @@ endfunction
 " 新規ノート
 function! SimplyNote#new() abort
   let view_buf = bufnr('[SimplyNoteView]')
+  if view_buf != -1 && getbufvar(view_buf, '&modified')
+    if confirm('Discard unsaved changes in SimplyNote view?', "&Yes\n&No", 2) != 1
+      return
+    endif
+  endif
+
   if view_buf == -1
     belowright split | enew | file [SimplyNoteView]
   else
@@ -772,7 +844,7 @@ function! SimplyNote#new() abort
   call setline(1, ['New Note', ''])
 
   " 新規なのでメタ情報は消す
-  unlet! b:simplynote_id b:simplynote_title b:simplynote_tags b:simplynote_files
+  unlet! b:simplynote_id b:simplynote_title b:simplynote_tags b:simplynote_files b:simplynote_attached_lines
 
   " ここで保存済み扱いにしてから編集を促す（任意）
   setlocal nomodified
@@ -829,7 +901,10 @@ function! SimplyNote#delete() abort
 
   echo "🗑️ The note has been deleted."
   " ビューをクリアして一覧更新
+  setlocal modifiable noreadonly
   silent! %delete _
   call setline(1, [' (Please select a note from the list.)'])
+  unlet! b:simplynote_id b:simplynote_title b:simplynote_tags b:simplynote_files b:simplynote_attached_lines
+  setlocal nomodified nomodifiable readonly
   call SimplyNote#refresh('')
 endfunction
